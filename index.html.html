@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>禮券進出貨登記</title>
+<style>
+:root{--bg:#f7f6f2;--card:#fff;--tx:#1d1d1b;--mu:#6b6b66;--bd:#dcdad2;--ac:#0f6e56;--ac2:#e1f5ee;--rd:#b3261e;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1a1a18;--card:#262624;--tx:#eeede8;--mu:#9a9990;--bd:#3d3d3a;--ac:#5dcaa5;--ac2:#04342c;--rd:#f09595}}
+:root[data-theme="dark"]{--bg:#1a1a18;--card:#262624;--tx:#eeede8;--mu:#9a9990;--bd:#3d3d3a;--ac:#5dcaa5;--ac2:#04342c;--rd:#f09595}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 -apple-system,"PingFang TC","Microsoft JhengHei",sans-serif}
+main{max-width:900px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:0 0 12px}
+nav{display:flex;gap:6px;margin-bottom:14px}
+nav button{flex:1;padding:10px;border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:8px;font:inherit;cursor:pointer}
+nav button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px;margin-bottom:14px}
+.row{display:flex;flex-wrap:wrap;gap:10px}
+label{display:flex;flex-direction:column;font-size:13px;color:var(--mu);gap:3px;flex:1;min-width:120px}
+input,select{padding:8px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);font:inherit}
+.go{margin-top:12px;padding:10px 18px;border:0;border-radius:8px;background:var(--ac);color:#fff;font:inherit;cursor:pointer}
+.msg{margin-top:8px;font-size:13px}.err{color:var(--rd)}.ok{color:var(--ac)}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:7px 8px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:top}
+th{color:var(--mu);font-weight:500;white-space:nowrap}
+.del{border:0;background:none;color:var(--rd);cursor:pointer;font:inherit}
+.tag{display:inline-block;background:var(--ac2);color:var(--ac);border-radius:4px;padding:0 6px;margin:1px;font-size:13px}
+.sold{background:transparent;color:var(--mu);text-decoration:line-through}
+.mu{color:var(--mu);font-size:13px}
+</style>
+</head>
+<body>
+<main>
+<h1>🎟️ 禮券進出貨登記</h1>
+<div id="warn" class="msg err"></div>
+<nav><button data-t="in" class="on">進貨</button><button data-t="out">出貨</button><button data-t="q">查詢</button></nav>
+
+<section id="in">
+<div class="card"><div class="row">
+<label>進貨日期<input type="date" id="iDate"></label>
+<label>面額 (V)<input id="iDen" list="dens" inputmode="numeric" placeholder="例如 5"></label>
+<label>編號起<input id="iFrom" placeholder="001"></label>
+<label>編號迄<input id="iTo" placeholder="100"></label>
+<label>備註(選填)<input id="iNote"></label>
+</div><button class="go" id="iGo">登記進貨</button><div id="iMsg" class="msg"></div></div>
+<div class="card"><b>進貨紀錄</b><div class="tw" id="iList"></div></div>
+</section>
+
+<section id="out" hidden>
+<div class="card"><div class="row">
+<label>賣出日期<input type="date" id="oDate"></label>
+<label>面額 (V)<input id="oDen" list="dens" inputmode="numeric" placeholder="例如 5"></label>
+<label style="flex:2">編號（可用逗號、空格或範圍）<input id="oNums" placeholder="001,002 或 001-005"></label>
+<label>Seller<input id="oSeller" placeholder="賣出人"></label>
+<label>備註(選填)<input id="oNote"></label>
+</div><button class="go" id="oGo">登記賣出</button><div id="oMsg" class="msg"></div></div>
+<div class="card"><b>賣出紀錄</b><div class="tw" id="oList"></div></div>
+</section>
+
+<section id="q" hidden>
+<div class="card"><b>庫存總覽</b><div class="tw" id="sum"></div></div>
+<div class="card"><div class="row">
+<label>面額<select id="qDen"></select></label>
+<label>狀態<select id="qSt"><option value="">全部</option><option value="stock">庫存中</option><option value="sold">已賣出</option></select></label>
+<label>編號搜尋<input id="qNo" placeholder="例如 015"></label>
+</div><div class="tw" id="qList" style="margin-top:10px"></div></div>
+<div class="card"><b>資料備份</b>
+<div class="mu">資料存在這台裝置的瀏覽器中。換電腦或清除瀏覽資料前，請先匯出備份。</div>
+<button class="go" id="bkOut">匯出備份</button>
+<button class="go" id="bkIn" style="background:var(--card);color:var(--tx);border:1px solid var(--bd)">匯入備份</button>
+<input type="file" id="bkFile" accept=".json,application/json" hidden>
+<div id="bkMsg" class="msg"></div></div>
+</section>
+<datalist id="dens"><option value="5"><option value="10"><option value="20"><option value="30"><option value="40"><option value="50"><option value="60"><option value="100"></datalist>
+</main>
+<script>
+var $=function(i){return document.getElementById(i)};
+var ins=[],outs=[],KEY="voucher_records_v1";
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+function load(){try{var d=JSON.parse(localStorage.getItem(KEY)||"{}");ins=d.ins||[];outs=d.outs||[]}catch(e){}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify({ins:ins,outs:outs}));$("warn").textContent="";return true}catch(e){$("warn").textContent="無法儲存到瀏覽器（可能是無痕模式或空間已滿），請先匯出備份。";return false}}
+var today=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
+$("iDate").value=today;$("oDate").value=today;
+function pad(s,w){s=String(s).trim();return s.length>=w?s:("000000"+s).slice(-w)}
+function parseNums(txt){
+  var out=[],toks=txt.split(/[,，、\s]+/).filter(Boolean);
+  for(var k=0;k<toks.length;k++){
+    var m=toks[k].match(/^(\d+)[-~～](\d+)$/);
+    if(m){var a=+m[1],b=+m[2],w=Math.max(3,m[1].length);if(b<a||b-a>2000)return null;for(var n=a;n<=b;n++)out.push(pad(n,w))}
+    else if(/^\d+$/.test(toks[k]))out.push(pad(toks[k],3));
+    else return null;
+  }
+  return out;
+}
+function key(d,n){return d+"|"+n}
+function build(){
+  var stock={},sold={};
+  ins.forEach(function(r){var a=+r.from,b=+r.to,w=Math.max(3,String(r.from).length);for(var n=a;n<=b;n++)stock[key(r.denom,pad(n,w))]={date:r.date,denom:r.denom,no:pad(n,w)}});
+  outs.forEach(function(r){(r.nums||[]).forEach(function(n){sold[key(r.denom,n)]=r.date})});
+  return{stock:stock,sold:sold};
+}
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function fmtNums(a){
+  if(!a.length)return"";var s=a.slice().sort(),out=[],st=s[0],pv=s[0];
+  for(var i=1;i<=s.length;i++){var c=s[i];if(c!==undefined&&+c===+pv+1){pv=c;continue}out.push(st===pv?st:st+"–"+pv);st=c;pv=c}
+  return out.join("、");
+}
+function render(){
+  var b=build();
+  $("iList").innerHTML=tbl(["進貨日期","禮券","編號","張數","備註",""],ins.slice().sort(function(x,y){return y.date.localeCompare(x.date)||y.ts-x.ts}).map(function(r){
+    return[esc(r.date),esc(r.denom)+"V",esc(r.from)+"–"+esc(r.to),+r.to-+r.from+1,esc(r.note),'<button class="del" data-di="'+r.id+'">刪除</button>']}));
+  $("oList").innerHTML=tbl(["賣出日期","禮券","編號","張數","Seller","備註",""],outs.slice().sort(function(x,y){return y.date.localeCompare(x.date)||y.ts-x.ts}).map(function(r){
+    return[esc(r.date),esc(r.denom)+"V",esc(fmtNums(r.nums)),r.nums.length,esc(r.seller),esc(r.note),'<button class="del" data-do="'+r.id+'">刪除</button>']}));
+  var dens={};Object.keys(b.stock).forEach(function(k){var r=b.stock[k];dens[r.denom]=dens[r.denom]||{t:0,s:0};dens[r.denom].t++;if(b.sold[k])dens[r.denom].s++});
+  outs.forEach(function(r){r.nums.forEach(function(n){if(!b.stock[key(r.denom,n)]){dens[r.denom]=dens[r.denom]||{t:0,s:0}}})});
+  var dl=Object.keys(dens).sort(function(a,c){return a-c});
+  $("sum").innerHTML=tbl(["禮券","進貨總數","已賣出","庫存"],dl.map(function(d){var x=dens[d];return[d+"V",x.t,x.s,"<b>"+(x.t-x.s)+"</b>"]}));
+  var sel=$("qDen"),cur=sel.value;sel.innerHTML='<option value="">全部</option>'+dl.map(function(d){return'<option value="'+d+'">'+d+'V</option>'}).join("");sel.value=cur;
+  qrender(b);
+}
+function qrender(b){
+  b=b||build();var d=$("qDen").value,st=$("qSt").value,no=$("qNo").value.trim(),rows=[];
+  Object.keys(b.stock).forEach(function(k){var r=b.stock[k],sd=b.sold[k];
+    if(d&&r.denom!==d)return;if(st==="stock"&&sd)return;if(st==="sold"&&!sd)return;if(no&&r.no.indexOf(pad(no,no.length))<0)return;
+    rows.push([+r.denom,r.no,[esc(r.denom)+"V",esc(r.no),esc(r.date),sd?esc(sd):'<span class="mu">—</span>',sd?"已賣出":'<span class="ok">庫存中</span>']])});
+  rows.sort(function(a,c){return a[0]-c[0]||a[1].localeCompare(c[1])});
+  var more=rows.length>500;
+  $("qList").innerHTML=tbl(["禮券","編號","進貨日期","賣出日期","狀態"],rows.slice(0,500).map(function(r){return r[2]}))+'<div class="mu">共 '+rows.length+' 張'+(more?'（僅顯示前 500，請縮小篩選）':'')+'</div>';
+}
+function tbl(h,rows){
+  if(!rows.length)return'<div class="mu" style="padding:8px">尚無資料</div>';
+  return"<table><tr>"+h.map(function(x){return"<th>"+x+"</th>"}).join("")+"</tr>"+rows.map(function(r){return"<tr>"+r.map(function(c){return"<td>"+c+"</td>"}).join("")+"</tr>"}).join("")+"</table>";
+}
+function msg(id,t,bad){$(id).textContent=t;$(id).className="msg "+(bad?"err":"ok")}
+document.querySelector("nav").onclick=function(e){var t=e.target.dataset.t;if(!t)return;
+  ["in","out","q"].forEach(function(x){$(x).hidden=x!==t});
+  Array.prototype.forEach.call(document.querySelectorAll("nav button"),function(b){b.className=b.dataset.t===t?"on":""})};
+["qDen","qSt"].forEach(function(i){$(i).onchange=function(){qrender()}});$("qNo").oninput=function(){qrender()};
+
+$("iGo").onclick=function(){
+  var den=$("iDen").value.replace(/v/i,"").trim(),f=$("iFrom").value.trim(),t=$("iTo").value.trim();
+  if(!$("iDate").value||!/^\d+$/.test(den)||!/^\d+$/.test(f)||!/^\d+$/.test(t))return msg("iMsg","請填寫日期、面額與編號起迄（數字）",1);
+  var w=Math.max(3,f.length);f=pad(f,w);t=pad(t,w);
+  if(+t<+f)return msg("iMsg","編號迄不可小於編號起",1);
+  var b=build();
+  for(var n=+f;n<=+t;n++){if(b.stock[key(den,pad(n,w))])return msg("iMsg",den+"V 編號 "+pad(n,w)+" 已進貨過，請檢查",1)}
+  ins.push({id:uid(),date:$("iDate").value,denom:den,from:f,to:t,note:$("iNote").value.trim(),ts:Date.now()});
+  if(!save()){ins.pop();return}
+  render();
+  try{
+    msg("iMsg","已登記："+den+"V "+f+"–"+t+"（"+(+t-+f+1)+" 張）");$("iFrom").value="";$("iTo").value="";$("iNote").value=""}
+  catch(e){}
+};
+$("oGo").onclick=function(){
+  var den=$("oDen").value.replace(/v/i,"").trim(),nums=parseNums($("oNums").value),seller=$("oSeller").value.trim();
+  if(!$("oDate").value||!/^\d+$/.test(den)||!nums||!nums.length)return msg("oMsg","請填寫日期、面額與正確的編號格式",1);
+  if(!seller)return msg("oMsg","請填寫 Seller",1);
+  var b=build(),seen={};
+  for(var i=0;i<nums.length;i++){var k=key(den,nums[i]);
+    if(seen[k])return msg("oMsg","編號 "+nums[i]+" 重複輸入",1);seen[k]=1;
+    if(!b.stock[k])return msg("oMsg",den+"V 編號 "+nums[i]+" 沒有進貨紀錄",1);
+    if(b.sold[k])return msg("oMsg",den+"V 編號 "+nums[i]+" 已在 "+b.sold[k]+" 賣出",1)}
+  outs.push({id:uid(),date:$("oDate").value,denom:den,nums:nums,seller:seller,note:$("oNote").value.trim(),ts:Date.now()});
+  if(!save()){outs.pop();return}
+  render();
+  try{
+    msg("oMsg","已登記賣出："+den+"V "+fmtNums(nums)+"（"+nums.length+" 張）");$("oNums").value="";$("oNote").value=""}
+  catch(e){}
+};
+var armed=null,armT=null;
+document.addEventListener("click",function(e){
+  var ds=e.target.dataset||{},di=ds.di,dO=ds.do,id=di||dO;
+  if(!id)return;
+  if(armed!==id){armed=id;e.target.textContent="再按一次確定刪除";clearTimeout(armT);armT=setTimeout(function(){armed=null;render()},4000);return}
+  armed=null;clearTimeout(armT);
+  if(di){var r=ins.filter(function(x){return x.id===di})[0],b=build(),used=false;
+    for(var n=+r.from;n<=+r.to;n++)if(b.sold[key(r.denom,pad(n,Math.max(3,r.from.length)))])used=true;
+    if(used){render();return msg("iMsg","這批已有賣出紀錄，請先刪除相關的賣出紀錄",1)}
+    ins=ins.filter(function(x){return x.id!==di});save();render();msg("iMsg","已刪除進貨紀錄")}
+  else{outs=outs.filter(function(x){return x.id!==dO});save();render();msg("oMsg","已刪除賣出紀錄，編號已回到庫存")}
+});
+$("bkOut").onclick=function(){
+  var blob=new Blob([JSON.stringify({ins:ins,outs:outs},null,1)],{type:"application/json"}),a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);a.download="voucher-backup-"+today+".json";document.body.appendChild(a);a.click();a.remove();
+  msg("bkMsg","已匯出備份檔")};
+$("bkIn").onclick=function(){$("bkFile").click()};
+$("bkFile").onchange=function(){
+  var f=this.files[0];if(!f)return;var r=new FileReader();
+  r.onload=function(){try{var d=JSON.parse(r.result);if(!Array.isArray(d.ins)||!Array.isArray(d.outs))throw 0;
+    ins=d.ins;outs=d.outs;save();render();msg("bkMsg","已匯入備份（原有資料已被取代）")}catch(e){msg("bkMsg","備份檔格式不正確",1)}};
+  r.readAsText(f);this.value=""};
+load();render();
+</script>
+</body>
+</html>
