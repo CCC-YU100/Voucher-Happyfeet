@@ -64,7 +64,7 @@ th{color:var(--mu);font-weight:500;white-space:nowrap}
 <div class="card"><div class="row">
 <label>面額<select id="qDen"></select></label>
 <label>狀態<select id="qSt"><option value="">全部</option><option value="stock">庫存中</option><option value="sold">已賣出</option></select></label>
-<label>編號搜尋<input id="qNo" placeholder="例如 015"></label>
+<label style="flex:2">編號或日期搜尋<input id="qNo" placeholder="編號 015，或日期 2026-11-22、2026-11、11-22"></label>
 </div><div class="tw" id="qList" style="margin-top:10px"></div></div>
 <div class="card"><b>資料備份</b>
 <div class="mu">資料存在這台裝置的瀏覽器中。換電腦或清除瀏覽資料前，請先匯出備份。</div>
@@ -120,10 +120,17 @@ function render(){
   var sel=$("qDen"),cur=sel.value;sel.innerHTML='<option value="">全部</option>'+dl.map(function(d){return'<option value="'+d+'">'+d+'V</option>'}).join("");sel.value=cur;
   qrender(b);
 }
+function hit(r,sd,q){
+  if(/^\d{1,4}[-\/.]\d{1,2}([-\/.]\d{1,2})?$/.test(q)){
+    var p=q.split(/[-\/.]/).map(function(x,i){return i===0&&x.length===4?x:pad(x,2)}).join("-");
+    return r.date.indexOf(p)>=0||(sd&&sd.indexOf(p)>=0);
+  }
+  return r.no.indexOf(q)>=0;
+}
 function qrender(b){
   b=b||build();var d=$("qDen").value,st=$("qSt").value,no=$("qNo").value.trim(),rows=[];
   Object.keys(b.stock).forEach(function(k){var r=b.stock[k],sd=b.sold[k];
-    if(d&&r.denom!==d)return;if(st==="stock"&&sd)return;if(st==="sold"&&!sd)return;if(no&&r.no.indexOf(pad(no,no.length))<0)return;
+    if(d&&r.denom!==d)return;if(st==="stock"&&sd)return;if(st==="sold"&&!sd)return;if(no&&!hit(r,sd,no))return;
     rows.push([+r.denom,r.no,[esc(r.denom)+"V",esc(r.no),esc(r.date),sd?esc(sd):'<span class="mu">—</span>',sd?"已賣出":'<span class="ok">庫存中</span>']])});
   rows.sort(function(a,c){return a[0]-c[0]||a[1].localeCompare(c[1])});
   var more=rows.length>500;
