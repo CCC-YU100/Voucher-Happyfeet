@@ -29,6 +29,7 @@ th{color:var(--mu);font-weight:500;white-space:nowrap}
 .tag{display:inline-block;background:var(--ac2);color:var(--ac);border-radius:4px;padding:0 6px;margin:1px;font-size:13px}
 .sold{background:transparent;color:var(--mu);text-decoration:line-through}
 .mu{color:var(--mu);font-size:13px}
+.tot td{background:var(--ac2);color:var(--ac)}
 </style>
 </head>
 <body>
@@ -52,7 +53,7 @@ th{color:var(--mu);font-weight:500;white-space:nowrap}
 <div class="card"><div class="row">
 <label>賣出日期<input type="date" id="oDate"></label>
 <label>面額 (V)<input id="oDen" list="dens" inputmode="numeric" placeholder="例如 5"></label>
-<label style="flex:2">編號（可用逗號、空格或範圍）<input id="oNums" placeholder="001,002 或 001-005"></label>
+<label style="flex:2">編號（可用範圍）<input id="oNums" placeholder="2550001-005 或 2550001-2550005"></label>
 <label>Seller<input id="oSeller" placeholder="賣出人"></label>
 <label>備註(選填)<input id="oNote"></label>
 </div><button class="go" id="oGo">登記賣出</button><div id="oMsg" class="msg"></div></div>
@@ -87,8 +88,11 @@ function pad(s,w){s=String(s).trim();return s.length>=w?s:("000000"+s).slice(-w)
 function parseNums(txt){
   var out=[],toks=txt.split(/[,，、\s]+/).filter(Boolean);
   for(var k=0;k<toks.length;k++){
-    var m=toks[k].match(/^(\d+)[-~～](\d+)$/);
-    if(m){var a=+m[1],b=+m[2],w=Math.max(3,m[1].length);if(b<a||b-a>2000)return null;for(var n=a;n<=b;n++)out.push(pad(n,w))}
+    var m=toks[k].match(/^(\d+)[-~～–—](\d+)$/);
+    if(m){var w=Math.max(3,m[1].length),a=+m[1],e=m[2];
+      if(e.length<m[1].length)e=m[1].slice(0,m[1].length-e.length)+e;
+      var b=+e;if(b<a||b-a>2000)return null;
+      for(var n=a;n<=b;n++)out.push(pad(n,w))}
     else if(/^\d+$/.test(toks[k]))out.push(pad(toks[k],3));
     else return null;
   }
@@ -107,12 +111,28 @@ function fmtNums(a){
   for(var i=1;i<=s.length;i++){var c=s[i];if(c!==undefined&&+c===+pv+1){pv=c;continue}out.push(st===pv?st:st+"–"+pv);st=c;pv=c}
   return out.join("、");
 }
+var showAll=false;
+function dstr(off){var d=new Date();d.setDate(d.getDate()-off);return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)}
+function excluded(r){var n=String(r.note||"").toLowerCase();return n.indexOf("change")>=0||n.indexOf("找")>=0||n.indexOf("作廢")>=0}
+function outHtml(){
+  var cut=dstr(2),all=outs.slice().sort(function(x,y){return y.date.localeCompare(x.date)||y.ts-x.ts}),
+      list=showAll?all:all.filter(function(r){return r.date>=cut}),hidden=all.length-list.length,rows="",cur=null,tot=0,qty=0;
+  function flush(){if(cur!==null)rows+='<tr class="tot"><td colspan="8"><b>'+esc(cur)+' Total：'+tot.toLocaleString()+'</b>　（計入 '+qty+' 張）</td></tr>'}
+  list.forEach(function(r){
+    if(r.date!==cur){flush();cur=r.date;tot=0;qty=0}
+    var n=r.nums.length,amt=(+r.denom)*n,ex=excluded(r);
+    if(!ex){tot+=amt;qty+=n}
+    rows+='<tr><td>'+esc(r.date)+'</td><td>'+esc(r.denom)+'V</td><td>'+esc(fmtNums(r.nums))+'</td><td>'+n+'</td><td>'+(ex?'<span class="mu">'+amt+'（不計入）</span>':amt)+'</td><td>'+esc(r.seller)+'</td><td>'+esc(r.note)+'</td><td><button class="del" data-do="'+r.id+'">刪除</button></td></tr>';
+  });
+  flush();
+  var h=list.length?'<table><tr><th>賣出日期</th><th>禮券</th><th>編號</th><th>張數</th><th>金額</th><th>Seller</th><th>備註</th><th></th></tr>'+rows+'</table>':'<div class="mu" style="padding:8px">'+(showAll?"尚無資料":"近三天沒有賣出紀錄")+'</div>';
+  return h+'<div class="mu" style="margin-top:8px">'+(showAll?"目前顯示全部紀錄":"只顯示近三天"+(hidden?"（另有 "+hidden+" 筆較早紀錄）":""))+' <button class="del" id="oAll" style="color:var(--ac)">'+(showAll?"只顯示近三天":"顯示全部")+'</button></div>';
+}
 function render(){
   var b=build();
   $("iList").innerHTML=tbl(["進貨日期","禮券","編號","張數","備註",""],ins.slice().sort(function(x,y){return y.date.localeCompare(x.date)||y.ts-x.ts}).map(function(r){
     return[esc(r.date),esc(r.denom)+"V",esc(r.from)+"–"+esc(r.to),+r.to-+r.from+1,esc(r.note),'<button class="del" data-di="'+r.id+'">刪除</button>']}));
-  $("oList").innerHTML=tbl(["賣出日期","禮券","編號","張數","Seller","備註",""],outs.slice().sort(function(x,y){return y.date.localeCompare(x.date)||y.ts-x.ts}).map(function(r){
-    return[esc(r.date),esc(r.denom)+"V",esc(fmtNums(r.nums)),r.nums.length,esc(r.seller),esc(r.note),'<button class="del" data-do="'+r.id+'">刪除</button>']}));
+  $("oList").innerHTML=outHtml();
   var dens={};Object.keys(b.stock).forEach(function(k){var r=b.stock[k];dens[r.denom]=dens[r.denom]||{t:0,s:0};dens[r.denom].t++;if(b.sold[k])dens[r.denom].s++});
   outs.forEach(function(r){r.nums.forEach(function(n){if(!b.stock[key(r.denom,n)]){dens[r.denom]=dens[r.denom]||{t:0,s:0}}})});
   var dl=Object.keys(dens).sort(function(a,c){return a-c});
@@ -149,6 +169,7 @@ document.querySelector("nav").onclick=function(e){var t=e.target.dataset.t;if(!t
 $("iGo").onclick=function(){
   var den=$("iDen").value.replace(/v/i,"").trim(),f=$("iFrom").value.trim(),t=$("iTo").value.trim();
   if(!$("iDate").value||!/^\d+$/.test(den)||!/^\d+$/.test(f)||!/^\d+$/.test(t))return msg("iMsg","請填寫日期、面額與編號起迄（數字）",1);
+  if(t.length<f.length)t=f.slice(0,f.length-t.length)+t;
   var w=Math.max(3,f.length);f=pad(f,w);t=pad(t,w);
   if(+t<+f)return msg("iMsg","編號迄不可小於編號起",1);
   var b=build();
@@ -178,6 +199,7 @@ $("oGo").onclick=function(){
 };
 var armed=null,armT=null;
 document.addEventListener("click",function(e){
+  if(e.target.id==="oAll"){showAll=!showAll;render();return}
   var ds=e.target.dataset||{},di=ds.di,dO=ds.do,id=di||dO;
   if(!id)return;
   if(armed!==id){armed=id;e.target.textContent="再按一次確定刪除";clearTimeout(armT);armT=setTimeout(function(){armed=null;render()},4000);return}
